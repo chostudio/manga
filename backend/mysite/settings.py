@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
 
 from dotenv import load_dotenv
 
@@ -83,20 +84,70 @@ TEMPLATES = [
 WSGI_APPLICATION = 'mysite.wsgi.application'
 
 
+def _postgres_config(
+    name: str,
+    user: str,
+    password: str,
+    host: str,
+    port: str,
+    *,
+    sslmode_from_url: str | None = None,
+) -> dict:
+    """Build Django PostgreSQL settings; SSL required for Supabase unless overridden."""
+    cfg: dict = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": name,
+        "USER": user,
+        "PASSWORD": password,
+        "HOST": host,
+        "PORT": port,
+    }
+    sslmode = (sslmode_from_url or "").strip().lower()
+    if not sslmode:
+        sslmode = os.getenv("POSTGRES_SSLMODE", "").strip().lower()
+    if not sslmode and "supabase" in host.lower():
+        sslmode = "require"
+    if sslmode:
+        cfg["OPTIONS"] = {"sslmode": sslmode}
+    return cfg
+
+
+def _postgres_from_database_url(url: str) -> dict:
+    parsed = urlparse(url)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in ("postgres", "postgresql"):
+        raise ValueError(
+            "DATABASE_URL must start with postgres:// or postgresql://"
+        )
+    db_name = (parsed.path or "").lstrip("/") or "postgres"
+    user = unquote(parsed.username or "")
+    password = unquote(parsed.password or "")
+    host = parsed.hostname or "localhost"
+    port = str(parsed.port or 5432)
+    ssl_params = parse_qs(parsed.query).get("sslmode") or []
+    url_ssl = ssl_params[0].strip() if ssl_params and ssl_params[0].strip() else None
+    return _postgres_config(
+        db_name, user, password, host, port, sslmode_from_url=url_ssl
+    )
+
+
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+_database_url = os.getenv("DATABASE_URL", "").strip()
 _postgres_db = os.getenv("POSTGRES_DB", "").strip()
-if _postgres_db:
+
+if _database_url:
+    DATABASES = {"default": _postgres_from_database_url(_database_url)}
+elif _postgres_db:
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": _postgres_db,
-            "USER": os.getenv("POSTGRES_USER", ""),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
-            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-            "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        }
+        "default": _postgres_config(
+            _postgres_db,
+            os.getenv("POSTGRES_USER", ""),
+            os.getenv("POSTGRES_PASSWORD", ""),
+            os.getenv("POSTGRES_HOST", "localhost"),
+            os.getenv("POSTGRES_PORT", "5432"),
+        )
     }
 else:
     DATABASES = {
