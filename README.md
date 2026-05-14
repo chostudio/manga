@@ -8,7 +8,7 @@ Search for manga panels by typing in vibes
 Search
 -User types in text-based search query on frontend e.g. "chibi mad expression"
 -Queries the Postgres database and grabfindss the k most nearest vector embeddedings, returning their image file paths
--Backend grabs the actual images from the Cloudflare R2
+-Backend grabs the actual images from Amazon S3
 -Backend gives the filepaths to the frontend
 
 Upload
@@ -16,7 +16,7 @@ Upload
 -Backend compresses the image by converting it into a smaller image type e.g. .avif format
 -OpenCV crops the manga panel boxes
 -runs the OpenCLIP embedding function
--stores the path to the file & embedding in the Cloudflare R2 storage
+-stores the path to the file & embedding in Amazon S3 (object keys) and Postgres (vectors)
 -Uploads the file into  or a local folder on your computer, depending on the ____ flag.
 
 Upload-webscrape

@@ -9,7 +9,7 @@ Intended flow (not implemented):
   2. Compress image.
   3. Crop into panel images.
   4. Run embedding model (e.g. OpenCLIP).
-  5. Store files and vectors in Postgres (and objects in R2 per product design).
+  5. Store files and vectors in Postgres (and objects in S3 per product design).
 
 Headers:
   Content-Type: multipart/form-data; boundary=... (set automatically by the client).

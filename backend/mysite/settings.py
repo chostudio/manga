@@ -157,12 +157,13 @@ else:
         }
     }
 
-# Cloudflare R2 (S3-compatible; consumed when you wire storage clients)
-R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
-R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "")
-R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
-R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "")
-R2_PUBLIC_BASE_URL = os.getenv("R2_PUBLIC_BASE_URL", "").rstrip("/")
+# Amazon S3 (consumed when you wire storage clients, e.g. boto3)
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
+# Optional: CloudFront or static website / virtual-hosted URL base for public URLs returned to the frontend
+AWS_S3_PUBLIC_BASE_URL = os.getenv("AWS_S3_PUBLIC_BASE_URL", "").rstrip("/")
 
 # Image compression
 TINIFY_API_KEY = os.getenv("TINIFY_API_KEY", "")

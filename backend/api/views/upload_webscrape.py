@@ -7,7 +7,7 @@ JSON body:
 Intended flow (not implemented):
   1. Fetch and parse the page; collect manga image URLs.
   2. For each image (or batch), run the same pipeline as POST /upload:
-     compress, crop, embed, store in Postgres / R2.
+     compress, crop, embed, store in Postgres / S3.
 
 Headers:
   Content-Type: application/json
