@@ -1,5 +1,7 @@
 <label for="search" class="sr-only">Search manga panels</label>
 <input
+  #searchInput
+  (keyup.enter)="onSearch(searchInput.value)"
   id="search"
   type="text"
   placeholder="Search manga panels by vibes..."
