@@ -7,12 +7,16 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
+
+from django.conf import settings
 
 MANGADEX_API = "https://api.mangadex.org"
 
@@ -24,6 +28,35 @@ CHAPTER_ID_RE = re.compile(
 )
 
 _MANGADEX_HOSTS = frozenset({"mangadex.org", "www.mangadex.org", "api.mangadex.org"})
+
+
+class TokenBucketLimiter:
+    """Thread-safe token bucket rate limiter."""
+
+    def __init__(self, rate: float, capacity: float):
+        self.rate = rate
+        self.capacity = capacity
+        self.tokens = capacity
+        self.last_fill = time.perf_counter()
+        self.lock = threading.Lock()
+
+    def wait_and_consume(self, tokens_to_consume: float = 1.0) -> None:
+        with self.lock:
+            while True:
+                now = time.perf_counter()
+                elapsed = now - self.last_fill
+                self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+                self.last_fill = now
+
+                if self.tokens >= tokens_to_consume:
+                    self.tokens -= tokens_to_consume
+                    return
+
+                sleep_time = (tokens_to_consume - self.tokens) / self.rate
+                time.sleep(sleep_time)
+
+
+_mangadex_api_limiter = TokenBucketLimiter(rate=5.0, capacity=5.0)
 
 
 @dataclass(frozen=True)
@@ -61,10 +94,17 @@ def extract_mangadex_chapter_id(url: str) -> str | None:
 
 
 def _http_json_get(url: str, *, timeout: int = 30) -> tuple[int, Any]:
+    # Ensure we respect the 5 requests/sec rate limit
+    _mangadex_api_limiter.wait_and_consume()
+
+    user_agent = getattr(settings, "SCRAPER_USER_AGENT", "MangaIndexer/0.1 (+https://example.com/contact)")
     req = urllib.request.Request(
         url,
         method="GET",
-        headers={"Accept": "application/json"},
+        headers={
+            "Accept": "application/json",
+            "User-Agent": user_agent,
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -140,18 +180,143 @@ def resolve_mangadex_chapter_pages(
     return MangadexChapterPages(page_urls=page_urls, filenames=filenames)
 
 
+def _should_report_to_network(url: str) -> bool:
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        if not host:
+            return False
+        # Do not report if it's on a mangadex.org domain
+        return not (host == "mangadex.org" or host.endswith(".mangadex.org"))
+    except Exception:
+        return False
+
+
+def _report_to_mangadex_network(
+    url: str,
+    success: bool,
+    cached: bool,
+    byte_size: int,
+    duration_ms: int,
+    user_agent: str,
+) -> None:
+    """
+    POST metadata back to the MangaDex@Home reporting endpoint.
+    Failures to report are ignored to avoid disrupting the scrape itself.
+    """
+    report_payload = {
+        "url": url,
+        "success": success,
+        "cached": cached,
+        "bytes": byte_size,
+        "duration": duration_ms,
+    }
+    req = urllib.request.Request(
+        "https://api.mangadex.network/report",
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": user_agent,
+        },
+        data=json.dumps(report_payload).encode("utf-8"),
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            pass
+    except Exception:
+        # Do not fail or block if the statistics report fails
+        pass
+
+
 def _fetch_at_home_image_bytes(url: str, *, timeout: int = 60) -> tuple[int, bytes]:
     """
-    GET image bytes from an at-home URL.
+    GET image bytes from an at-home URL and report statistics to MangaDex@Home network.
 
     Do not attach Authorization — MangaDex image servers reject authenticated requests.
     """
-    req = urllib.request.Request(url, method="GET")
+    user_agent = getattr(settings, "SCRAPER_USER_AGENT", "MangaIndexer/0.1 (+https://example.com/contact)")
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={
+            "User-Agent": user_agent,
+        },
+    )
+
+    success = False
+    cached = False
+    byte_size = 0
+    code = 0
+    data = b""
+    start_time = time.perf_counter()
+
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.getcode() or 200, resp.read()
+            code = resp.getcode() or 200
+            data = resp.read()
+            byte_size = len(data)
+            success = (code == 200 and byte_size > 0)
+            x_cache = resp.headers.get("X-Cache", "")
+            cached = x_cache.lower().startswith("hit")
+
+        end_time = time.perf_counter()
+        duration_ms = int((end_time - start_time) * 1000)
+
+        if _should_report_to_network(url):
+            _report_to_mangadex_network(
+                url=url,
+                success=success,
+                cached=cached,
+                byte_size=byte_size,
+                duration_ms=duration_ms,
+                user_agent=user_agent,
+            )
+
+        return code, data
+
     except urllib.error.HTTPError as e:
-        return e.code, e.read()
+        code = e.code
+        try:
+            data = e.read()
+        except Exception:
+            data = b""
+        byte_size = len(data)
+        success = False
+        x_cache = e.headers.get("X-Cache", "")
+        cached = x_cache.lower().startswith("hit")
+
+        end_time = time.perf_counter()
+        duration_ms = int((end_time - start_time) * 1000)
+
+        if _should_report_to_network(url):
+            _report_to_mangadex_network(
+                url=url,
+                success=success,
+                cached=cached,
+                byte_size=byte_size,
+                duration_ms=duration_ms,
+                user_agent=user_agent,
+            )
+
+        return code, data
+
+    except Exception as e:
+        end_time = time.perf_counter()
+        duration_ms = int((end_time - start_time) * 1000)
+
+        if _should_report_to_network(url):
+            _report_to_mangadex_network(
+                url=url,
+                success=False,
+                cached=False,
+                byte_size=0,
+                duration_ms=duration_ms,
+                user_agent=user_agent,
+            )
+
+        raise e
 
 
 def _fetch_one_page(
