@@ -1,4 +1,5 @@
 from django.db import models
+from pgvector.django import VectorField
 
 
 class ChapterIngestion(models.Model):
@@ -37,6 +38,7 @@ class StoredPanel(models.Model):
     byte_size = models.PositiveIntegerField()
     content_type = models.CharField(max_length=64, default="image/avif")
     public_url = models.URLField(max_length=1024, blank=True)
+    embedding = VectorField(dimensions=512, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

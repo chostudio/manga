@@ -6,3 +6,8 @@ pillow-avif-plugin==1.5.2
 psycopg[binary]==3.3.2
 python-dotenv==1.2.1
 sqlparse==0.5.5
+opencv-python-headless==4.10.0.84
+torch
+torchvision
+open-clip-torch
+pgvector
