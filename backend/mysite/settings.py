@@ -157,13 +157,21 @@ else:
         }
     }
 
-# Amazon S3 (consumed when you wire storage clients, e.g. boto3)
+# Object storage: "local" (dev default) or "s3"
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local").strip().lower()
+_local_storage_dir = os.getenv("LOCAL_STORAGE_DIR", "").strip()
+LOCAL_STORAGE_DIR = _local_storage_dir or str(BASE_DIR / "media" / "storage")
+
+# Amazon S3 (required when STORAGE_BACKEND=s3)
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "")
 AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
 # Optional: CloudFront or static website / virtual-hosted URL base for public URLs returned to the frontend
 AWS_S3_PUBLIC_BASE_URL = os.getenv("AWS_S3_PUBLIC_BASE_URL", "").rstrip("/")
+
+MEDIA_ROOT = Path(LOCAL_STORAGE_DIR)
+MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 
 # Image compression
 TINIFY_API_KEY = os.getenv("TINIFY_API_KEY", "")

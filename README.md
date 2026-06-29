@@ -46,4 +46,6 @@ source .venv/bin/activate
 is it pip install -r
 requirements.txt
 
+pip3 install -r requirements.txt
+
 python3 manage.py runserver
