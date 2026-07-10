@@ -45,3 +45,27 @@ def generate_embedding(image_bytes: bytes) -> list[float]:
     except Exception as e:
         print(f"Error generating embedding: {e}")
         return []
+
+_tokenizer = open_clip.get_tokenizer(MODEL_NAME)
+
+def generate_text_embedding(text: str) -> list[float]:
+    """
+    Generate a vector embedding for text using OpenCLIP.
+    
+    Args:
+        text: The text to embed.
+        
+    Returns:
+        A list of floats representing the embedding vector.
+    """
+    try:
+        text_input = _tokenizer([text])
+        
+        with torch.no_grad():
+            text_features = _model.encode_text(text_input)
+            text_features /= text_features.norm(dim=-1, keepdim=True)
+            
+        return text_features.squeeze(0).cpu().numpy().tolist()
+    except Exception as e:
+        print(f"Error generating text embedding: {e}")
+        return []

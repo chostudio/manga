@@ -16,6 +16,7 @@ Headers:
 """
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 import uuid
 
 from api.image_split import split_image_into_panels
@@ -25,6 +26,7 @@ from api.storage import put_object
 from api.models import ChapterIngestion, StoredPanel
 
 
+@csrf_exempt
 @require_POST
 def upload(request):
     """

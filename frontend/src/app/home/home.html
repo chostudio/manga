@@ -1,5 +1,15 @@
-<main class="flex items-center justify-center flex-1 px-4">
-  <div class="w-full max-w-xl">
-    <app-search-bar />
+<main class="flex flex-col items-center justify-start flex-1 px-4 py-8">
+  <div class="w-full max-w-xl mb-8">
+    <app-search-bar (searchResults)="onSearchResults($event)"/>
+  </div>
+  
+  <div *ngIf="panels.length > 0" class="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div *ngFor="let panel of panels" class="rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900 shadow-sm transition-transform hover:scale-105">
+      <img [src]="panel.url" alt="Manga panel" class="w-full h-auto object-cover" loading="lazy">
+    </div>
+  </div>
+  
+  <div *ngIf="panels.length === 0" class="text-zinc-500 text-center mt-8">
+    Enter a search query to find manga panels by vibes!
   </div>
 </main>
