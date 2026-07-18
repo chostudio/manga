@@ -79,6 +79,7 @@ def process_panels(
 ) -> list[dict[str, Any]]:
     """
     Persist panel bytes to object storage and record metadata in the database.
+    Also generates CLIP embeddings for each panel and its sub-elements.
     """
     chapter_id = chapter_ingestion.chapter_id
     quality = chapter_ingestion.quality
@@ -103,6 +104,10 @@ def process_panels(
             ext,
         )
         obj = put_object(key, panel_bytes, content_type)
+
+        # Generate panel-level CLIP embedding
+        embedding = generate_embedding(panel_bytes)
+
         record, _created = StoredPanel.objects.update_or_create(
             chapter=chapter_ingestion,
             page_index=page_index,
@@ -112,6 +117,7 @@ def process_panels(
                 "byte_size": obj.byte_size,
                 "content_type": obj.content_type,
                 "public_url": obj.public_url,
+                "embedding": embedding if embedding else None,
             },
         )
         # Detect + embed sub-elements (face, hair, hand, clothing)

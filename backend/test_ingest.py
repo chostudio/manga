@@ -1,26 +1,43 @@
+"""
+Test script: ingest a MangaDex chapter and run semantic searches.
+"""
 import requests
+import json
+import time
 
-base_url = "http://localhost:8000"
-image_path = "/Users/chrisho/.gemini/antigravity-ide/brain/e40e722e-7bac-4df7-b688-f725b55c5f17/manga_panel_test_1784416618676.png"
+BASE = "http://localhost:8000"
+CHAPTER_URL = "https://mangadex.org/chapter/e716db76-fefa-46c1-8b0a-3a7a8879d7d2/"
 
-print("Uploading image...")
-with open(image_path, "rb") as f:
-    response = requests.post(f"{base_url}/upload", files={"image": f})
+print("=" * 60)
+print("1. Ingesting MangaDex chapter...")
+print("=" * 60)
 
-print("Upload response:", response.status_code, response.text)
+resp = requests.post(
+    f"{BASE}/upload-webscrape",
+    json={"url": CHAPTER_URL, "quality": "data-saver"},
+    timeout=300,
+)
+print(f"Status: {resp.status_code}")
+data = resp.json()
+print(f"Chapter: {data.get('chapter_id')}")
+print(f"Pages fetched: {data.get('fetched_ok')}")
+print(f"Panels stored: {data.get('stored_panels')}")
+if data.get("errors"):
+    print(f"Errors: {json.dumps(data['errors'], indent=2)}")
 
-print("\nSearching for 'face'...")
-res = requests.get(f"{base_url}/search", params={"q": "face"})
-print("Search 'face' results:", res.json())
+print()
+print("=" * 60)
+print("2. Running searches...")
+print("=" * 60)
 
-print("\nSearching for 'hand'...")
-res = requests.get(f"{base_url}/search", params={"q": "hand"})
-print("Search 'hand' results:", res.json())
+queries = ["face", "hand", "hair", "clothing", "shocked", "fist", "shouting", "eyes"]
 
-print("\nSearching for 'hair'...")
-res = requests.get(f"{base_url}/search", params={"q": "hair"})
-print("Search 'hair' results:", res.json())
+for q in queries:
+    resp = requests.get(f"{BASE}/search", params={"q": q}, timeout=30)
+    results = resp.json().get("panels", [])
+    print(f"\n  '{q}' -> {len(results)} results")
+    for r in results[:5]:
+        print(f"    panel #{r['id']}  matched_via={r['matched_via']}  url={r['url']}")
 
-print("\nSearching for 'clothing'...")
-res = requests.get(f"{base_url}/search", params={"q": "clothing"})
-print("Search 'clothing' results:", res.json())
+print()
+print("Done!")
