@@ -11,6 +11,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        pgvector.django.VectorExtension(),
         migrations.AddField(
             model_name='storedpanel',
             name='embedding',
