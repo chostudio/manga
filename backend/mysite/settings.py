@@ -44,6 +44,7 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -54,6 +55,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -191,6 +193,15 @@ SCRAPER_ZENROWS_API_KEY = os.getenv("SCRAPER_ZENROWS_API_KEY", "")
 # Embeddings
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "")
 EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu")
+
+# CORS — allow the Angular dev server and any origins listed in the env
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:4200",
+    "http://127.0.0.1:4200",
+]
+_extra_cors = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+if _extra_cors:
+    CORS_ALLOWED_ORIGINS += [o.strip() for o in _extra_cors.split(",") if o.strip()]
 
 
 # Password validation

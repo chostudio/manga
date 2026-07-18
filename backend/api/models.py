@@ -1,6 +1,8 @@
 from django.db import models
 from pgvector.django import VectorField
 
+SUB_ELEMENT_LABELS = ("face", "hair", "hand", "clothing")
+
 
 class ChapterIngestion(models.Model):
     """One MangaDex chapter ingest run (metadata for stored pages/panels)."""
@@ -52,3 +54,33 @@ class StoredPanel(models.Model):
 
     def __str__(self) -> str:
         return f"{self.chapter.chapter_id} p{self.page_index} n{self.panel_index}"
+
+
+class PanelSubElement(models.Model):
+    """
+    A semantically meaningful sub-region within a StoredPanel.
+
+    Each row stores the CLIP embedding of a cropped area (face, hair, hand,
+    clothing) so those regions can be independently searched.  The search
+    result always returns the *parent panel* URL — the crop is never shown.
+    """
+
+    LABEL_CHOICES = [(lbl, lbl) for lbl in SUB_ELEMENT_LABELS]
+
+    panel = models.ForeignKey(
+        StoredPanel,
+        on_delete=models.CASCADE,
+        related_name="sub_elements",
+    )
+    label = models.CharField(max_length=64, choices=LABEL_CHOICES, db_index=True)
+    # Bounding box in pixels relative to the panel image (stored for future use)
+    bbox = models.JSONField(null=True, blank=True)
+    # 512-dim CLIP embedding of the cropped region
+    embedding = VectorField(dimensions=512, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["panel", "label"]
+
+    def __str__(self) -> str:
+        return f"{self.panel} [{self.label}]"

@@ -23,7 +23,8 @@ from api.image_split import split_image_into_panels
 from api.embedding import generate_embedding
 from api.image_compress import compress_image_if_needed
 from api.storage import put_object
-from api.models import ChapterIngestion, StoredPanel
+from api.models import ChapterIngestion, PanelSubElement, StoredPanel
+from api.subelement_detect import detect_sub_elements
 
 
 @csrf_exempt
@@ -64,7 +65,7 @@ def upload(request):
         stored = put_object(key, compressed.data, compressed.content_type)
         
         # Save to DB
-        StoredPanel.objects.create(
+        stored_panel = StoredPanel.objects.create(
             chapter=chapter,
             page_index=0,
             panel_index=i,
@@ -74,6 +75,28 @@ def upload(request):
             public_url=stored.public_url,
             embedding=embedding if embedding else None
         )
+
+        # Detect + embed sub-elements (face, hair, hand, clothing)
+        try:
+            detections = detect_sub_elements(compressed.data)
+            sub_elements = []
+            for det in detections:
+                emb = generate_embedding(det.crop_bytes)
+                sub_elements.append(
+                    PanelSubElement(
+                        panel=stored_panel,
+                        label=det.label,
+                        bbox=det.bbox,
+                        embedding=emb if emb else None,
+                    )
+                )
+            if sub_elements:
+                PanelSubElement.objects.bulk_create(sub_elements)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Sub-element embedding failed for panel %s: %s", stored_panel.pk, exc
+            )
         
         results.append({
             "panel_index": i,

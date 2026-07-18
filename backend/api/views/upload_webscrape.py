@@ -33,8 +33,40 @@ from api.mangadex import (
     is_mangadex_hostname,
     resolve_mangadex_chapter_pages,
 )
-from api.models import ChapterIngestion, StoredPanel
+from api.models import ChapterIngestion, PanelSubElement, StoredPanel
 from api.storage import build_panel_storage_key, put_object
+from api.embedding import generate_embedding
+from api.subelement_detect import detect_sub_elements
+
+
+def _embed_sub_elements(panel_bytes: bytes, stored_panel: StoredPanel) -> None:
+    """
+    Detect sub-elements in a panel, embed each crop with CLIP, and save to DB.
+
+    Errors are caught and logged so that a failure here never aborts the
+    parent ingest pipeline.
+    """
+    try:
+        detections = detect_sub_elements(panel_bytes)
+        if not detections:
+            return
+        sub_elements = []
+        for det in detections:
+            emb = generate_embedding(det.crop_bytes)
+            sub_elements.append(
+                PanelSubElement(
+                    panel=stored_panel,
+                    label=det.label,
+                    bbox=det.bbox,
+                    embedding=emb if emb else None,
+                )
+            )
+        PanelSubElement.objects.bulk_create(sub_elements)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Sub-element embedding failed for panel %s: %s", stored_panel.pk, exc
+        )
 
 
 def process_panels(
@@ -82,6 +114,8 @@ def process_panels(
                 "public_url": obj.public_url,
             },
         )
+        # Detect + embed sub-elements (face, hair, hand, clothing)
+        _embed_sub_elements(panel_bytes, record)
         stored.append(
             {
                 "panel_index": panel_index,

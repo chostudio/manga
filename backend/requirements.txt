@@ -11,3 +11,5 @@ torch
 torchvision
 open-clip-torch
 pgvector
+ultralytics>=8.2
+django-cors-headers
