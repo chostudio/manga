@@ -2,14 +2,71 @@
   <div class="w-full max-w-xl mb-8">
     <app-search-bar (searchResults)="onSearchResults($event)"/>
   </div>
-  
-  <div *ngIf="panels.length > 0" class="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-    <div *ngFor="let panel of panels" class="rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900 shadow-sm transition-transform hover:scale-105">
-      <img [src]="panel.url" alt="Manga panel" class="w-full h-auto object-cover" loading="lazy">
+
+  <!-- Masonry grid using CSS columns -->
+  <div *ngIf="panels.length > 0" class="masonry-grid w-full max-w-6xl">
+    <div
+      *ngFor="let panel of panels"
+      class="masonry-item"
+      (click)="openPanel(panel)"
+    >
+      <img [src]="panel.url" alt="Manga panel" loading="lazy">
     </div>
   </div>
-  
+
   <div *ngIf="panels.length === 0" class="text-zinc-500 text-center mt-8">
     Enter a search query to find manga panels by vibes!
   </div>
 </main>
+
+<!-- Modal overlay -->
+<div
+  *ngIf="selectedPanel"
+  class="modal-overlay"
+  (click)="onOverlayClick($event)"
+  (keydown)="onKeydown($event)"
+  tabindex="0"
+>
+  <div class="modal-content">
+    <!-- Left: fixed-size image -->
+    <div class="modal-image-side">
+      <img [src]="selectedPanel.url" alt="Manga panel">
+    </div>
+
+    <!-- Right: metadata -->
+    <div class="modal-meta-side">
+      <button class="modal-close" (click)="closePanel()" aria-label="Close">
+        ✕
+      </button>
+
+      <h3 class="modal-title">Panel Details</h3>
+
+      <div class="meta-row">
+        <span class="meta-label">ID</span>
+        <span class="meta-value">{{ selectedPanel.id }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Chapter</span>
+        <span class="meta-value meta-mono">{{ selectedPanel.chapter_id }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Page</span>
+        <span class="meta-value">{{ selectedPanel.page_index }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Panel</span>
+        <span class="meta-value">{{ selectedPanel.panel_index }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Matched via</span>
+        <span class="meta-value">
+          <span class="meta-badge">{{ formatMatchedVia(selectedPanel.matched_via) }}</span>
+        </span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">URL</span>
+        <span class="meta-value meta-mono meta-url">{{ selectedPanel.url }}</span>
+      </div>
+    </div>
+  </div>
+</div>
