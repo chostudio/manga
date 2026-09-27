@@ -1,14 +1,14 @@
 # 📖 Manga Search Engine
 
-A search engine for manga panels using natural language descriptions (search by "vibes") rather than exact keywords. Powered by an Angular frontend and a Django backend, it implements panel cropping (OpenCV), semantic embeddings (OpenCLIP), and automated chapter webscraping (including MangaDex integration).
+A search engine for manga panels. Powered by an Angular frontend and a Django backend, it detects true comic panel boxes with a manga-tuned **YOLO** model, indexes each panel with **booru-style tags** (WD SwinV2 anime tagger) plus anime **face/eyes/hand/person** detection, and searches those tags first — falling back to OpenCLIP "vibes" embeddings only for free-text queries with no tag match. Includes automated chapter webscraping (MangaDex integration).
 
 ---
 
 ## 🚀 Key Features
 
-* **Natural Language Search**: Enter queries like `"chibi shocked face"` or `"action fight scene"` to find semantic matches in the database.
+* **Tag-first Concept Search**: Enter queries like `"eyes"`, `"angry"`, `"chibi"`, or `"hands"`. Queries are mapped to booru tags (via a synonym map + underscore-token overlap) and to detected sub-elements (face/eyes/hand/person), ranked by tagger confidence, with CLIP as a free-text fallback.
 * **Flexible Ingestion**:
-  * **Direct Image Upload**: Upload single pages. The backend automatically crops panel boxes using OpenCV, generates vector embeddings using OpenCLIP, and uploads images to the selected storage provider.
+  * **Direct Image Upload**: Upload single pages. The backend detects panel boxes with a YOLO manga-panel model (OpenCV gutter split as fallback), tags + embeds each panel, and uploads images to the selected storage provider.
   * **Web Scraping Ingestion**: Provide a URL to fetch pages and batch-process all panels.
   * **MangaDex Specific Flow**: Seamless integration with MangaDex chapter URLs. Downloads, processes, splits, and indexes chapters automatically.
 * **Optimized Image Pipeline**: Converts uploaded pages into `.avif` formats with custom compression configurations to save storage.
@@ -26,10 +26,12 @@ graph TD
     
     subgraph Ingestion Pipeline
         BE -->|Process Link| Scraper[Web Scraper / MangaDex Client]
-        Scraper -->|Pages| OpenCV[OpenCV Panel Cropper]
-        OpenCV -->|Panels| OpenCLIP[OpenCLIP Vector Generator]
-        OpenCLIP -->|Embeddings| DB[(PostgreSQL / SQLite)]
-        OpenCV -->|Compressed Images| Storage{Storage Backend: Local / S3}
+        Scraper -->|Pages| YOLO[YOLO Panel Detector]
+        YOLO -->|Panels| Tagger[WD Tagger + anime face/eye/hand/person detectors]
+        Tagger -->|Tags + sub-elements| DB[(PostgreSQL + pgvector)]
+        YOLO -->|Panels| OpenCLIP[OpenCLIP Embedding]
+        OpenCLIP -->|Vectors| DB
+        YOLO -->|Compressed Images| Storage{Storage Backend: Local / S3}
     end
 
     subgraph Query Pipeline
@@ -95,6 +97,20 @@ Ensure you have the following installed:
    python manage.py runserver
    ```
    The backend server will run on `http://127.0.0.1:8000/`.
+
+   > **Note:** On first ingest/search the backend downloads model weights from
+   > the Hugging Face hub (YOLO panel detector + anime detectors + WD tagger),
+   > cached under `~/.cache/huggingface`.
+
+7. (Optional) Re-index existing panels with the current pipeline after a model
+   or algorithm change:
+   ```bash
+   python manage.py reingest            # all chapters
+   python manage.py reingest --only <chapter_id>
+   python manage.py reingest --dry-run
+   ```
+   MangaDex chapters are re-downloaded and fully re-cropped; direct uploads are
+   re-tagged/re-embedded in place (their original page is no longer available).
 
 ---
 

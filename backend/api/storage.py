@@ -48,6 +48,36 @@ def public_url_for_key(key: str) -> str:
     return ""
 
 
+def get_object(key: str) -> bytes | None:
+    """Read an object's bytes back from storage, or None if unavailable."""
+    backend = settings.STORAGE_BACKEND
+    if backend == "local":
+        path = Path(settings.LOCAL_STORAGE_DIR) / key
+        try:
+            return path.read_bytes()
+        except OSError:
+            return None
+    if backend == "s3":
+        import boto3
+
+        bucket = settings.AWS_STORAGE_BUCKET_NAME
+        if not bucket:
+            return None
+        client_kwargs: dict = {}
+        if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+            client_kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
+            client_kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+        if settings.AWS_DEFAULT_REGION:
+            client_kwargs["region_name"] = settings.AWS_DEFAULT_REGION
+        try:
+            client = boto3.client("s3", **client_kwargs)
+            resp = client.get_object(Bucket=bucket, Key=key)
+            return resp["Body"].read()
+        except Exception:
+            return None
+    return None
+
+
 def put_object(key: str, data: bytes, content_type: str) -> StoredObject:
     backend = settings.STORAGE_BACKEND
     if backend == "s3":

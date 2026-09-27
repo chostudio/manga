@@ -5,6 +5,11 @@ import torch
 import open_clip
 from PIL import Image
 
+try:
+    import pillow_avif  # noqa: F401 — registers the AVIF codec so Image.open() handles .avif
+except ImportError:
+    pass
+
 # Initialize the model globally so we don't reload it per image
 # We use ViT-B-32 as a fast and good default
 MODEL_NAME = "ViT-B-32"

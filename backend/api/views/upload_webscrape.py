@@ -33,40 +33,9 @@ from api.mangadex import (
     is_mangadex_hostname,
     resolve_mangadex_chapter_pages,
 )
-from api.models import ChapterIngestion, PanelSubElement, StoredPanel
+from api.models import ChapterIngestion, StoredPanel
 from api.storage import build_panel_storage_key, put_object
-from api.embedding import generate_embedding
-from api.subelement_detect import detect_sub_elements
-
-
-def _embed_sub_elements(panel_bytes: bytes, stored_panel: StoredPanel) -> None:
-    """
-    Detect sub-elements in a panel, embed each crop with CLIP, and save to DB.
-
-    Errors are caught and logged so that a failure here never aborts the
-    parent ingest pipeline.
-    """
-    try:
-        detections = detect_sub_elements(panel_bytes)
-        if not detections:
-            return
-        sub_elements = []
-        for det in detections:
-            emb = generate_embedding(det.crop_bytes)
-            sub_elements.append(
-                PanelSubElement(
-                    panel=stored_panel,
-                    label=det.label,
-                    bbox=det.bbox,
-                    embedding=emb if emb else None,
-                )
-            )
-        PanelSubElement.objects.bulk_create(sub_elements)
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).warning(
-            "Sub-element embedding failed for panel %s: %s", stored_panel.pk, exc
-        )
+from api.ingest import index_panel
 
 
 def process_panels(
@@ -105,9 +74,6 @@ def process_panels(
         )
         obj = put_object(key, panel_bytes, content_type)
 
-        # Generate panel-level CLIP embedding
-        embedding = generate_embedding(panel_bytes)
-
         record, _created = StoredPanel.objects.update_or_create(
             chapter=chapter_ingestion,
             page_index=page_index,
@@ -117,11 +83,11 @@ def process_panels(
                 "byte_size": obj.byte_size,
                 "content_type": obj.content_type,
                 "public_url": obj.public_url,
-                "embedding": embedding if embedding else None,
+                "embedding": None,
             },
         )
-        # Detect + embed sub-elements (face, hair, hand, clothing)
-        _embed_sub_elements(panel_bytes, record)
+        # Tag + detect sub-elements + embed (panel-level CLIP set inside)
+        index_panel(record, panel_bytes)
         stored.append(
             {
                 "panel_index": panel_index,

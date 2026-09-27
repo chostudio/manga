@@ -20,11 +20,10 @@ from django.views.decorators.csrf import csrf_exempt
 import uuid
 
 from api.image_split import split_image_into_panels
-from api.embedding import generate_embedding
 from api.image_compress import compress_image_if_needed
+from api.ingest import index_panel
 from api.storage import put_object
-from api.models import ChapterIngestion, PanelSubElement, StoredPanel
-from api.subelement_detect import detect_sub_elements
+from api.models import ChapterIngestion, StoredPanel
 
 
 @csrf_exempt
@@ -54,16 +53,13 @@ def upload(request):
     
     # 2. Process each panel
     for i, panel_bytes in enumerate(panels_bytes):
-        # Compress
+        # Compress (for storage only)
         compressed = compress_image_if_needed(panel_bytes)
-        
-        # Embed
-        embedding = generate_embedding(compressed.data)
-        
+
         # Store
         key = f"upload/{dummy_chapter_id}/page_0/panel_{i:04d}.{compressed.extension}"
         stored = put_object(key, compressed.data, compressed.content_type)
-        
+
         # Save to DB
         stored_panel = StoredPanel.objects.create(
             chapter=chapter,
@@ -73,35 +69,17 @@ def upload(request):
             byte_size=stored.byte_size,
             content_type=stored.content_type,
             public_url=stored.public_url,
-            embedding=embedding if embedding else None
+            embedding=None,
         )
 
-        # Detect + embed sub-elements (face, hair, hand, clothing)
-        try:
-            detections = detect_sub_elements(compressed.data)
-            sub_elements = []
-            for det in detections:
-                emb = generate_embedding(det.crop_bytes)
-                sub_elements.append(
-                    PanelSubElement(
-                        panel=stored_panel,
-                        label=det.label,
-                        bbox=det.bbox,
-                        embedding=emb if emb else None,
-                    )
-                )
-            if sub_elements:
-                PanelSubElement.objects.bulk_create(sub_elements)
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning(
-                "Sub-element embedding failed for panel %s: %s", stored_panel.pk, exc
-            )
-        
+        # Tag + detect sub-elements + embed from the raw (uncompressed) panel
+        index_panel(stored_panel, panel_bytes)
+
         results.append({
             "panel_index": i,
             "url": stored.public_url,
-            "has_embedding": bool(embedding)
+            "has_embedding": bool(stored_panel.embedding is not None),
+            "tags": sorted((stored_panel.tags or {}).keys()),
         })
         
     return JsonResponse({

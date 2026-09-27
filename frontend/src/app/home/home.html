@@ -11,6 +11,8 @@
       (click)="openPanel(panel)"
     >
       <img [src]="panel.url" alt="Manga panel" loading="lazy">
+      <span *ngIf="panel.matched_tags && panel.matched_tags.length > 0" class="similarity-badge">{{ panel.matched_tags[0] }}</span>
+      <span *ngIf="(!panel.matched_tags || panel.matched_tags.length === 0) && panel.matched_labels && panel.matched_labels.length > 0" class="similarity-badge">{{ panel.matched_labels[0] }}</span>
     </div>
   </div>
 
@@ -58,9 +60,27 @@
         <span class="meta-value">{{ selectedPanel.panel_index }}</span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Matched via</span>
+        <span class="meta-label">Relevance</span>
+        <span class="meta-value">
+          <span class="meta-badge similarity">{{ formatScore(selectedPanel.score) }}</span>
+        </span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Best match</span>
         <span class="meta-value">
           <span class="meta-badge">{{ formatMatchedVia(selectedPanel.matched_via) }}</span>
+        </span>
+      </div>
+      <div class="meta-row" *ngIf="selectedPanel.matched_tags && selectedPanel.matched_tags.length > 0">
+        <span class="meta-label">Matched tags</span>
+        <span class="meta-value">
+          <span class="meta-badge label-badge" *ngFor="let tag of selectedPanel.matched_tags">{{ tag }}</span>
+        </span>
+      </div>
+      <div class="meta-row" *ngIf="selectedPanel.matched_labels && selectedPanel.matched_labels.length > 0">
+        <span class="meta-label">Matched elements</span>
+        <span class="meta-value">
+          <span class="meta-badge label-badge" *ngFor="let label of selectedPanel.matched_labels">{{ label }}</span>
         </span>
       </div>
       <div class="meta-row">
