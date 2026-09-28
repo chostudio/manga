@@ -1,6 +1,34 @@
 # 📖 Manga Search Engine
 
-A search engine for manga panels. Powered by an Angular frontend and a Django backend, it detects true comic panel boxes with a manga-tuned **YOLO** model, indexes each panel — and every detected face/person region within it — with **booru-style tags** (WD EVA02-Large anime tagger) plus anime **face/eyes/hand/person** detection, and searches those tags first (with an emotion-aware synonym map: `shocked`→`surprised`, `embarrassed`→`blush`, etc.) — falling back to OpenCLIP "vibes" embeddings only for free-text queries with no tag match. Includes automated chapter webscraping (MangaDex integration).
+A search engine for manga panels. It detects true comic panel boxes with a manga-tuned **YOLO** model, indexes each panel — and every detected face/person region within it — with **booru-style tags** (WD EVA02-Large anime tagger) plus anime **face/eyes/hand/person** detection, and searches those tags first (with an emotion-aware synonym map: `shocked`→`surprised`, `embarrassed`→`blush`, etc.) — falling back to OpenCLIP "vibes" embeddings only for free-text queries with no tag match. Includes automated chapter webscraping (MangaDex integration).
+
+---
+
+## 🧩 Architecture — polyglot microservices (one repo)
+
+The heavy ML is Python-only; the orchestration/API/query work is Java. Each part
+runs in the stack it's best suited to, communicating over HTTP:
+
+| Service | Stack | Responsibility |
+|---|---|---|
+| `services/ml` | Python / FastAPI | Panel detection (YOLO), face/eyes/hand/person detection, WD tagging, OpenCLIP embeddings. Stateless. |
+| `services/api` | Java / Spring Boot | Angular-facing **search** — tag/vector ranking over Postgres/pgvector; calls `ml` for the CLIP text vector. |
+| `services/ingestion` | Java / Spring Boot | MangaDex download + orchestration; calls `ml` per page/panel; writes Postgres + storage. |
+| `frontend` | Angular | UI (points at `api`). |
+| `backend` | Django (legacy) | The original monolith; superseded by the three services above. |
+
+Shared **Postgres + pgvector**. Run the whole stack:
+
+```bash
+docker compose -f deploy/docker-compose.yml up --build
+# api:8080  ingestion:8090  ml:8001  db:5432
+# search:  curl "http://localhost:8080/search?q=angry"
+# ingest:  curl -X POST localhost:8090/ingest -H 'content-type: application/json' \
+#            -d '{"url":"https://mangadex.org/chapter/<uuid>","quality":"data-saver"}'
+```
+
+Each service has its own README with local (non-Docker) run instructions. The
+sections below describe the original Django monolith, still runnable from `backend/`.
 
 ---
 
