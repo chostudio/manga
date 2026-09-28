@@ -1,0 +1,20 @@
+# Web
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pydantic>=2
+
+# Imaging
+pillow==11.2.1
+pillow-avif-plugin==1.5.2
+numpy<2
+opencv-python-headless>=4.10
+
+# ML / CV (Python-only stack: this is why this service exists)
+torch
+torchvision
+open-clip-torch
+ultralytics>=8.4
+huggingface_hub>=0.24
+dghs-imgutils>=0.19
+onnxruntime>=1.18
