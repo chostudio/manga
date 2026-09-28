@@ -83,6 +83,14 @@
           <span class="meta-badge label-badge" *ngFor="let label of selectedPanel.matched_labels">{{ label }}</span>
         </span>
       </div>
+      <div class="meta-row" *ngIf="selectedPanel.tags && selectedPanel.tags.length > 0">
+        <span class="meta-label">All tags</span>
+        <span class="meta-value">
+          <span class="meta-badge tag-badge"
+                *ngFor="let tag of selectedPanel.tags"
+                [class.tag-matched]="selectedPanel.matched_tags.includes(tag)">{{ tag }}</span>
+        </span>
+      </div>
       <div class="meta-row">
         <span class="meta-label">URL</span>
         <span class="meta-value meta-mono meta-url">{{ selectedPanel.url }}</span>

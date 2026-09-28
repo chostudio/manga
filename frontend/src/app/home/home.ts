@@ -14,6 +14,7 @@ interface PanelResult {
   similarity: number;
   matched_tags: string[];
   matched_labels: string[];
+  tags: string[];
 }
 
 @Component({
@@ -57,6 +58,7 @@ export class Home {
   formatMatchedVia(matched_via: string): string {
     if (matched_via === 'tag') return 'Tag match';
     if (matched_via === 'sub_element') return 'Detected element';
+    if (matched_via === 'related') return 'Related tag';
     if (matched_via === 'vibes') return 'Vibes (CLIP)';
     return matched_via;
   }

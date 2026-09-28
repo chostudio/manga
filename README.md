@@ -1,6 +1,6 @@
 # 📖 Manga Search Engine
 
-A search engine for manga panels. Powered by an Angular frontend and a Django backend, it detects true comic panel boxes with a manga-tuned **YOLO** model, indexes each panel with **booru-style tags** (WD SwinV2 anime tagger) plus anime **face/eyes/hand/person** detection, and searches those tags first — falling back to OpenCLIP "vibes" embeddings only for free-text queries with no tag match. Includes automated chapter webscraping (MangaDex integration).
+A search engine for manga panels. Powered by an Angular frontend and a Django backend, it detects true comic panel boxes with a manga-tuned **YOLO** model, indexes each panel — and every detected face/person region within it — with **booru-style tags** (WD EVA02-Large anime tagger) plus anime **face/eyes/hand/person** detection, and searches those tags first (with an emotion-aware synonym map: `shocked`→`surprised`, `embarrassed`→`blush`, etc.) — falling back to OpenCLIP "vibes" embeddings only for free-text queries with no tag match. Includes automated chapter webscraping (MangaDex integration).
 
 ---
 

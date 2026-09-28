@@ -16,11 +16,17 @@ from __future__ import annotations
 import io
 import logging
 
+from django.conf import settings
 from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-GENERAL_THRESHOLD = 0.35
+# Which WD tagger to use. EVA02_Large is the most accurate v3 tagger (highest
+# F1); SwinV2_v3 is a faster/lighter alternative. Override with WD_TAGGER_MODEL.
+MODEL_NAME = getattr(settings, "WD_TAGGER_MODEL", "EVA02_Large")
+# Lower threshold => more tags (higher recall). 0.30 gives a rich tag set while
+# staying above the tagger's noise floor.
+GENERAL_THRESHOLD = float(getattr(settings, "WD_TAG_THRESHOLD", 0.30))
 
 # Universal manga/medium tags: true of essentially every B&W manga panel, so
 # useless for ranking.  Dropped to keep the tag store focused on content.
@@ -56,6 +62,7 @@ def tag_image(image_bytes: bytes, threshold: float = GENERAL_THRESHOLD) -> dict[
 
         _rating, general, _chars = get_wd14_tags(
             pil,
+            model_name=MODEL_NAME,
             general_threshold=threshold,
             drop_overlap=True,
         )

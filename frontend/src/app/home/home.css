@@ -206,6 +206,21 @@
   text-transform: capitalize;
 }
 
+.meta-badge.tag-badge {
+  margin-right: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: rgba(113, 113, 122, 0.18);
+  color: #a1a1aa;
+}
+
+.meta-badge.tag-badge.tag-matched {
+  background: rgba(163, 230, 53, 0.18);
+  color: #a3e635;
+  font-weight: 600;
+}
+
 /* Small screens: stack vertically */
 @media (max-width: 640px) {
   .modal-content {

@@ -38,32 +38,107 @@ FINAL_K = 30          # results returned to the client
 VECTOR_TOP_K = 60     # panels pulled from the vector index for the vibes fallback
 LABEL_WEIGHT = 0.4    # bonus per matched sub-element type present in a panel
 VECTOR_WEIGHT = 0.25  # weight of CLIP vibes similarity in the blend
-MAX_VIBES_FILLER = 6  # vibes-only panels to append when strong matches exist
+TAGS_IN_RESULT = 16   # how many of a panel's own tags to return for display
 
-# Query token -> extra candidate booru tags that aren't obvious by string overlap.
+# Query word -> candidate booru tags. Only tags that actually exist in the WD
+# EVA02 vocabulary are listed here (verified against its label set), so a query
+# word maps onto real emotion/content signals. Near-synonym query words that are
+# NOT themselves tags (e.g. "shocked", "fear", "furious") deliberately map onto
+# the tags that *do* exist for that concept. Emotion groups are grouped together
+# and kept mutually exclusive enough that one emotion won't pull another's tags
+# (e.g. "angry" never maps to "blush").
 _TAG_SYNONYMS: dict[str, list[str]] = {
-    "angry": ["angry", "anger", "annoyed", "clenched_teeth", "v-shaped_eyebrows",
-              "scowl", "glaring", "frown", "furrowed_brow", "pout", "rage"],
-    "mad": ["angry", "annoyed", "clenched_teeth", "scowl", "glaring"],
+    # ---- angry ---------------------------------------------------------
+    "angry": ["angry", "annoyed", "scowl", "glaring", "v-shaped_eyebrows",
+              "furrowed_brow", "frown", "pout", "clenched_teeth"],
+    "mad": ["angry", "annoyed", "scowl", "glaring", "clenched_teeth"],
+    "anger": ["angry", "annoyed", "scowl", "glaring"],
+    "furious": ["angry", "scowl", "glaring", "clenched_teeth"],
+    "rage": ["angry", "scowl", "glaring", "clenched_teeth"],
+    "annoyed": ["annoyed", "angry", "pout", "frown"],
+    "irritated": ["annoyed", "angry", "frown"],
+    # ---- surprised / shocked ------------------------------------------
+    "surprised": ["surprised", "wide-eyed", "open_mouth", "spoken_exclamation_mark"],
+    "surprise": ["surprised", "wide-eyed", "open_mouth"],
+    "shocked": ["surprised", "wide-eyed", "open_mouth", "spoken_exclamation_mark"],
+    "shock": ["surprised", "wide-eyed", "open_mouth"],
+    "startled": ["surprised", "wide-eyed", "open_mouth"],
+    "astonished": ["surprised", "wide-eyed", "open_mouth"],
+    "amazed": ["surprised", "wide-eyed"],
+    # ---- embarrassed / shy --------------------------------------------
+    "embarrassed": ["embarrassed", "flustered", "blush", "full-face_blush", "shy",
+                    "light_blush", "nervous_sweating"],
+    "embarrassment": ["embarrassed", "flustered", "blush", "full-face_blush"],
+    "flustered": ["flustered", "embarrassed", "blush", "full-face_blush"],
+    "shy": ["shy", "embarrassed", "blush", "light_blush"],
+    "bashful": ["shy", "embarrassed", "blush"],
+    "blush": ["blush", "full-face_blush", "light_blush", "embarrassed"],
+    "blushing": ["blush", "full-face_blush", "embarrassed"],
+    # ---- sad / crying -------------------------------------------------
+    "sad": ["sad", "crying", "tears", "streaming_tears", "depressed", "frown"],
+    "crying": ["crying", "crying_with_eyes_open", "tears", "streaming_tears"],
+    "cry": ["crying", "tears", "streaming_tears"],
+    "tears": ["tears", "streaming_tears", "crying"],
+    "sobbing": ["crying", "streaming_tears", "crying_with_eyes_open"],
+    "upset": ["sad", "crying", "frown", "depressed"],
+    "depressed": ["depressed", "sad", "expressionless"],
+    "disappointed": ["frown", "sad", "depressed"],
+    # ---- happy --------------------------------------------------------
+    "happy": ["happy", "smile", "grin", "laughing", "light_smile"],
+    "smile": ["smile", "grin", "happy", "light_smile"],
+    "smiling": ["smile", "grin", "happy", "light_smile"],
+    "grin": ["grin", "smile", "evil_smile"],
+    "joyful": ["happy", "smile", "laughing"],
+    "cheerful": ["happy", "smile", "grin"],
+    "laughing": ["laughing", "grin", "open_mouth"],
+    # ---- scared / nervous ---------------------------------------------
+    "scared": ["scared", "trembling", "panicking", "nervous", "wince", "nervous_sweating"],
+    "afraid": ["scared", "trembling", "nervous", "panicking"],
+    "fear": ["scared", "trembling", "panicking", "nervous"],
+    "fearful": ["scared", "trembling", "nervous"],
+    "terrified": ["scared", "trembling", "panicking"],
+    "frightened": ["scared", "trembling", "panicking"],
+    "nervous": ["nervous", "nervous_sweating", "worried", "sweatdrop", "trembling"],
+    "anxious": ["nervous", "worried", "nervous_sweating"],
+    "worried": ["worried", "nervous", "frown"],
+    "panic": ["panicking", "scared", "nervous_sweating"],
+    "panicking": ["panicking", "scared", "nervous_sweating"],
+    # ---- other expressions --------------------------------------------
+    "serious": ["serious", "expressionless"],
+    "stern": ["serious", "frown", "expressionless"],
+    "expressionless": ["expressionless", "serious"],
+    "deadpan": ["expressionless", "serious", "bored"],
+    "blank": ["expressionless"],
+    "smug": ["smug", "evil_smile", "grin"],
+    "smirk": ["smug", "evil_smile"],
+    "confident": ["smug", "grin"],
+    "confused": ["confused", "thinking", "spoken_question_mark"],
+    "puzzled": ["confused", "thinking"],
+    "disgust": ["disgust", "frown"],
+    "disgusted": ["disgust", "frown"],
+    "bored": ["bored", "expressionless", "sleepy"],
+    "sleepy": ["sleepy", "bored"],
+    "tired": ["sleepy", "bored"],
+    "evil": ["yandere", "crazy_eyes", "evil_smile"],
+    "creepy": ["yandere", "crazy_eyes"],
+    "crazy": ["crazy_eyes", "yandere"],
+    "yandere": ["yandere", "crazy_eyes", "evil_smile"],
+    "screaming": ["screaming", "open_mouth"],
+    "yelling": ["screaming", "open_mouth"],
+    "shouting": ["screaming", "open_mouth"],
+    "pain": ["wince", "clenched_teeth"],
+    "hurt": ["wince", "clenched_teeth"],
+    # ---- non-emotion content ------------------------------------------
     "chibi": ["chibi", "super_deformed"],
     "eyes": ["eye", "eyes", "closed_eyes", "one_eye_closed", "glowing_eyes"],
     "eye": ["eye", "eyes", "closed_eyes", "one_eye_closed", "glowing_eyes"],
-    "face": ["face", "portrait", "close-up", "expressionless"],
+    "face": ["face", "portrait", "close-up"],
     "faces": ["face", "portrait", "close-up"],
     "hand": ["hand", "hands", "clenched_hand", "open_hand", "pointing", "fist", "waving"],
     "hands": ["hand", "hands", "clenched_hand", "open_hand", "pointing", "fist"],
-    "smile": ["smile", "grin", "happy", "smiling"],
-    "smiling": ["smile", "grin", "happy"],
-    "happy": ["smile", "grin", "happy", "laughing"],
-    "sad": ["tears", "crying", "sad", "depressed", "streaming_tears"],
-    "crying": ["tears", "crying", "streaming_tears", "tearing_up"],
-    "surprised": ["surprised", "shocked", "open_mouth", "wide-eyed"],
-    "shocked": ["surprised", "shocked", "open_mouth", "wide-eyed"],
-    "blush": ["blush", "embarrassed", "blushing"],
     "fight": ["fighting", "battle", "punching", "kicking", "motion_lines",
-              "speed_lines", "weapon", "sword", "action"],
+              "speed_lines", "weapon", "sword"],
     "action": ["motion_lines", "speed_lines", "fighting", "battle", "explosion"],
-    "scared": ["scared", "fear", "sweatdrop", "trembling", "nervous"],
 }
 
 # Query token -> sub-element label to boost when that region was detected.
@@ -76,36 +151,66 @@ _LABEL_SYNONYMS: dict[str, str] = {
 }
 
 
+# Ambiguous signals that occur across several emotions/contexts (stored here in
+# normalized, underscored form). They match at reduced weight so they only nudge
+# ranking rather than define it — e.g. "open_mouth" shouldn't make a talking
+# panel read as "surprised", and "clenched_teeth" shouldn't equal "angry".
+_LOOSE_TAGS = {
+    "clenched_teeth", "teeth", "open_mouth", "wide_eyed", "sweatdrop", "sweat",
+    "light_blush", "spoken_exclamation_mark",
+    "spoken_question_mark", "!", "!?", "frown", "pout", "portrait", "close_up",
+}
+
+
 def _normalize(text: str) -> str:
     return text.strip().lower().replace(" ", "_").replace("-", "_")
 
 
-def _query_candidates(query: str) -> set[str]:
-    """Candidate booru tags (normalized) implied by the query text."""
+def _query_candidates(query: str) -> dict[str, float]:
+    """
+    Candidate booru tags (normalized) implied by the query, each with a
+    confidence weight: the literal query words are trusted (1.0), synonyms less
+    so (0.7), and loosely-correlated synonyms least (0.45).  This keeps a fuzzy
+    expansion like angry->clenched_teeth from outranking a literal `angry` tag.
+    """
     q = _normalize(query)
-    tokens = {t for t in q.split("_") if t}
-    candidates: set[str] = {q} | tokens
-    for tok in list(tokens) + [query.strip().lower()]:
-        candidates.update(_normalize(c) for c in _TAG_SYNONYMS.get(tok, []))
-    return {c for c in candidates if c}
+    cands: dict[str, float] = {q: 1.0}
+    for tok in q.split("_"):
+        if tok:
+            cands[tok] = 1.0
+    for tok in list(q.split("_")) + [query.strip().lower()]:
+        for syn in _TAG_SYNONYMS.get(tok, []):
+            n = _normalize(syn)
+            w = 0.45 if n in _LOOSE_TAGS else 0.8
+            cands[n] = max(cands.get(n, 0.0), w)
+    return {c: w for c, w in cands.items() if c}
 
 
-def _match_stored_tags(candidates: set[str], stored_tags: list[str]) -> dict[str, float]:
-    """Map query candidates to actual stored tags, with a match weight (0-1)."""
+def _match_stored_tags(candidates: dict[str, float], stored_tags: list[str]) -> dict[str, float]:
+    """
+    Map query candidates to actual stored tags, returning ``{stored_tag: weight}``.
+
+    A candidate matches a stored tag only when the candidate is the *same as* or
+    *more general than* the stored tag (exact, or the candidate's tokens are a
+    subset of the stored tag's — e.g. "eyes" -> "closed_eyes").  It deliberately
+    does NOT match when the stored tag is more general than the candidate (e.g.
+    the synonym "clenched_teeth" must not match a bare "teeth" tag on a grin).
+    """
     matched: dict[str, float] = {}
     for st in stored_tags:
         st_norm = _normalize(st)
         st_tokens = set(st_norm.split("_"))
-        for c in candidates:
+        for c, cw in candidates.items():
             if not c:
                 continue
             if c == st_norm:
-                matched[st] = max(matched.get(st, 0.0), 1.0)
-                break
+                matched[st] = max(matched.get(st, 0.0), 1.0 * cw)
+                continue
             c_tokens = set(c.split("_"))
-            overlap = c_tokens & st_tokens
-            if overlap and (c in st_norm or c_tokens <= st_tokens or st_tokens <= c_tokens):
-                matched[st] = max(matched.get(st, 0.0), 0.7)
+            # candidate is same-or-more-general than the stored tag only
+            # (candidate tokens are a subset of the stored tag's tokens)
+            if c_tokens <= st_tokens:
+                matched[st] = max(matched.get(st, 0.0), 0.7 * cw)
     return matched
 
 
@@ -120,9 +225,12 @@ def search(request):
     if not q:
         return JsonResponse({"panels": []})
 
-    # accumulator: panel_id -> scoring parts
+    # accumulator: panel_id -> scoring parts. "specific_score" counts only
+    # non-loose tag matches, so a panel matching just an ambiguous tag like
+    # open_mouth doesn't count as a real (strong) hit.
     acc: dict[int, dict] = defaultdict(
-        lambda: {"tag_score": 0.0, "labels": set(), "matched_tags": set(), "vector_sim": 0.0}
+        lambda: {"tag_score": 0.0, "specific_score": 0.0, "labels": set(),
+                 "matched_tags": set(), "vector_sim": 0.0}
     )
     panels_by_id: dict[int, StoredPanel] = {}
 
@@ -141,9 +249,13 @@ def search(request):
             )
             for row in tag_rows:
                 pid = row["panel_id"]
-                w = matched_tag_weights.get(row["tag"], 0.0)
-                acc[pid]["tag_score"] += float(row["score"]) * w
-                acc[pid]["matched_tags"].add(row["tag"])
+                tag = row["tag"]
+                w = matched_tag_weights.get(tag, 0.0)
+                contribution = float(row["score"]) * w
+                acc[pid]["tag_score"] += contribution
+                acc[pid]["matched_tags"].add(tag)
+                if _normalize(tag) not in _LOOSE_TAGS:
+                    acc[pid]["specific_score"] += contribution
 
         # ---- 2. sub-element label matching -----------------------------
         wanted_labels = _query_labels(q)
@@ -181,16 +293,18 @@ def search(request):
         return JsonResponse({"error": f"Search failed: {e}"}, status=500)
 
     # ---- 4. blend + rank -----------------------------------------------
-    # "strong" = matched by tag or sub-element; "vibes" = CLIP similarity only.
-    # Strong matches always rank first; weak vibes only fill in behind them (and
-    # are the sole results when nothing matched by tag/label — the honest fallback).
+    # "strong"  = matched a specific (non-loose) tag or a detected sub-element.
+    # "weak"    = matched only ambiguous loose tags (e.g. open_mouth alone).
+    # "vibes"   = CLIP similarity only.
+    # Strong results are returned alone when present; weak/vibes are the honest
+    # fallback only when nothing specific matched — this stops loose tags from
+    # padding an emotion query with unrelated face panels.
     strong: list = []
-    vibes: list = []
+    weak: list = []
     for pid, parts in acc.items():
         panel = panels_by_id.get(pid)
         if panel is None:
             continue
-        is_strong = parts["tag_score"] > 0 or parts["labels"]
         final = (
             parts["tag_score"]
             + LABEL_WEIGHT * len(parts["labels"])
@@ -198,25 +312,33 @@ def search(request):
         )
         if final <= 0:
             continue
-        (strong if is_strong else vibes).append((final, pid, panel, parts))
+        is_strong = parts["specific_score"] > 0 or bool(parts["labels"])
+        (strong if is_strong else weak).append((final, pid, panel, parts))
 
     strong.sort(key=lambda t: -t[0])
-    vibes.sort(key=lambda t: -t[0])
+    weak.sort(key=lambda t: -t[0])
 
-    if strong:
-        scored = strong[:FINAL_K] + vibes[:MAX_VIBES_FILLER]
-        scored = scored[:FINAL_K]
-    else:
-        scored = vibes[:FINAL_K]
+    scored = strong[:FINAL_K] if strong else weak[:FINAL_K]
 
     results = []
     for final, pid, panel, parts in scored:
-        if parts["tag_score"] > 0:
+        if parts["specific_score"] > 0:
             matched_via = "tag"
         elif parts["labels"]:
             matched_via = "sub_element"
+        elif parts["tag_score"] > 0:
+            matched_via = "related"  # only loose/ambiguous tags matched
         else:
             matched_via = "vibes"
+        # Show the matched tags most relevant to the query first (by match weight,
+        # then score), not alphabetically — so the real emotion tag leads.
+        matched_sorted = sorted(
+            parts["matched_tags"],
+            key=lambda t: (-matched_tag_weights.get(t, 0.0), -(panel.tags or {}).get(t, 0.0), t),
+        )
+        top_tags = [
+            t for t, _s in sorted((panel.tags or {}).items(), key=lambda kv: -kv[1])
+        ][:TAGS_IN_RESULT]
         results.append(
             {
                 "id": panel.id,
@@ -227,8 +349,9 @@ def search(request):
                 "matched_via": matched_via,
                 "score": round(final, 4),
                 "similarity": round(parts["vector_sim"], 4),
-                "matched_tags": sorted(parts["matched_tags"]),
+                "matched_tags": matched_sorted,
                 "matched_labels": sorted(parts["labels"]),
+                "tags": top_tags,
             }
         )
 

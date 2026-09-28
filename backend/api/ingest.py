@@ -24,8 +24,14 @@ from api.tagging import merge_tags, tag_image
 
 logger = logging.getLogger(__name__)
 
-# Face-crop tags weight (facial expressions are highly reliable on face crops).
-_FACE_TAG_WEIGHT = 1.0
+# Cap how many crops of each kind we tag per panel, to bound ingest cost on
+# busy panels (tag the largest regions first).
+_MAX_FACE_CROPS = 5
+_MAX_PERSON_CROPS = 5
+
+
+def _bbox_area(det) -> int:
+    return det.bbox["w"] * det.bbox["h"]
 
 
 def index_panel(stored_panel: StoredPanel, panel_bytes: bytes) -> None:
@@ -52,25 +58,40 @@ def _index_panel_inner(stored_panel: StoredPanel, panel_bytes: bytes) -> None:
 
     # ---- sub-element detection ------------------------------------------
     detections = detect_sub_elements(panel_bytes)
+    faces = sorted((d for d in detections if d.label == "face"), key=_bbox_area, reverse=True)
+    persons = sorted((d for d in detections if d.label == "person"), key=_bbox_area, reverse=True)
 
-    # ---- tagging: whole panel + each face crop --------------------------
+    # ---- tagging: whole panel + each face + each person region ----------
+    # Tagging each detected character region separately captures per-character
+    # attributes and expressions (e.g. one angry face in a crowd) that a single
+    # whole-panel pass blurs together.
     panel_tags = tag_image(panel_bytes)
     face_tags: dict[str, float] = {}
-    for det in detections:
-        if det.label == "face":
-            ft = tag_image(det.crop_bytes)
-            face_tags = merge_tags(face_tags, ft)
+    for det in faces[:_MAX_FACE_CROPS]:
+        face_tags = merge_tags(face_tags, tag_image(det.crop_bytes))
+    person_tags: dict[str, float] = {}
+    for det in persons[:_MAX_PERSON_CROPS]:
+        person_tags = merge_tags(person_tags, tag_image(det.crop_bytes))
 
-    merged = merge_tags(panel_tags, {t: s * _FACE_TAG_WEIGHT for t, s in face_tags.items()})
+    merged = merge_tags(panel_tags, face_tags, person_tags)
     stored_panel.tags = merged or None
     stored_panel.save(update_fields=["embedding", "tags"])
 
     # ---- persist PanelTag rows ------------------------------------------
-    tag_rows = []
-    for tag, score in merged.items():
-        # Attribute source to whichever pass produced the higher score.
-        source = "face" if face_tags.get(tag, 0.0) >= panel_tags.get(tag, 0.0) and tag in face_tags else "panel"
-        tag_rows.append(PanelTag(panel=stored_panel, tag=tag, score=score, source=source))
+    # Source = the region that produced this tag's highest score.
+    def _source_for(tag: str) -> str:
+        best = max(
+            (("face", face_tags.get(tag, 0.0)),
+             ("person", person_tags.get(tag, 0.0)),
+             ("panel", panel_tags.get(tag, 0.0))),
+            key=lambda kv: kv[1],
+        )
+        return best[0]
+
+    tag_rows = [
+        PanelTag(panel=stored_panel, tag=tag, score=score, source=_source_for(tag))
+        for tag, score in merged.items()
+    ]
     if tag_rows:
         PanelTag.objects.bulk_create(tag_rows, ignore_conflicts=True)
 
