@@ -21,7 +21,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Value("${manga.cors-origins:http://localhost:4200,http://127.0.0.1:4200}")
     private String[] corsOrigins;
 
-    @Value("${manga.storage.local-dir:../../backend/media/storage}")
+    @Value("${manga.storage.local-dir:../../media/storage}")
     private String storageDir;
 
     @Value("${manga.storage.media-url:/media}")

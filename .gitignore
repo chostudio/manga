@@ -1,0 +1,15 @@
+# Panel image storage (data, not code)
+media/
+
+# OS
+.DS_Store
+**/.DS_Store
+
+# Java build artifacts
+services/*/.gradle/
+services/*/build/
+
+# Python
+services/*/.venv/
+**/__pycache__/
+*.pyc

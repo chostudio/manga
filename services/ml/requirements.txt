@@ -6,7 +6,8 @@ pydantic>=2
 
 # Imaging
 pillow==11.2.1
-pillow-avif-plugin==1.5.2
+# pillow-avif-plugin is optional (embedding.py imports it in try/except); the
+# MangaDex ingest flow is JPEG/PNG, so it's omitted to avoid a py3.13 build break.
 numpy<2
 opencv-python-headless>=4.10
 

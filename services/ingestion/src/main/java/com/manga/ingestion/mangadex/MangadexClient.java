@@ -33,6 +33,28 @@ public class MangadexClient {
             .connectTimeout(Duration.ofSeconds(30)).build();
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // Politeness gate: enforce a minimum interval between outbound MangaDex
+    // requests so we stay well under the API's ~5 req/s limit even if callers
+    // parallelize. 300ms => at most ~3 req/s.
+    private static final long MIN_INTERVAL_MS = 300;
+    private final Object rateLock = new Object();
+    private long lastRequestAt = 0L;
+
+    private void throttle() {
+        synchronized (rateLock) {
+            long now = System.currentTimeMillis();
+            long wait = MIN_INTERVAL_MS - (now - lastRequestAt);
+            if (wait > 0) {
+                try {
+                    Thread.sleep(wait);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            lastRequestAt = System.currentTimeMillis();
+        }
+    }
+
     public record ChapterPages(List<String> pageUrls, List<String> filenames) {}
 
     public static String extractChapterId(String url) {
@@ -46,6 +68,7 @@ public class MangadexClient {
     /** GET /at-home/server/{id}, build ordered page URLs for the requested quality. */
     public ChapterPages resolveChapterPages(String chapterId, String quality) {
         try {
+            throttle();
             HttpRequest req = HttpRequest.newBuilder(URI.create(API + "/at-home/server/" + chapterId))
                     .header("Accept", "application/json")
                     .header("User-Agent", USER_AGENT)
@@ -86,6 +109,7 @@ public class MangadexClient {
     /** Download one page image (no Authorization header). Returns bytes or throws. */
     public byte[] downloadPage(String url) {
         try {
+            throttle();
             HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                     .header("User-Agent", USER_AGENT)
                     .timeout(Duration.ofSeconds(60))

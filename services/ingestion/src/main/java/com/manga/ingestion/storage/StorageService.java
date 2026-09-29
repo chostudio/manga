@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class StorageService {
 
-    @Value("${manga.storage.local-dir:../../backend/media/storage}")
+    @Value("${manga.storage.local-dir:../../media/storage}")
     private String localDir;
 
     @Value("${manga.storage.media-url:/media}")

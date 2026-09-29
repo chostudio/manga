@@ -12,5 +12,5 @@ spring:
 manga:
   ml-base-url: ${ML_BASE_URL:http://localhost:8001}
   storage:
-    local-dir: ${MANGA_STORAGE_LOCAL_DIR:../../backend/media/storage}
+    local-dir: ${MANGA_STORAGE_LOCAL_DIR:../../media/storage}
     media-url: ${MEDIA_URL:/media}
