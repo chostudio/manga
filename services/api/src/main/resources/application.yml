@@ -13,3 +13,7 @@ manga:
   # Python ml service (CLIP text embedding for the vibes fallback)
   ml-base-url: ${ML_BASE_URL:http://localhost:8001}
   cors-origins: ${CORS_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
+  # Panel images (written by the ingestion service) are served at /media/**
+  storage:
+    local-dir: ${MANGA_STORAGE_LOCAL_DIR:../../backend/media/storage}
+    media-url: ${MEDIA_URL:/media}

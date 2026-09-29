@@ -44,8 +44,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgrespassword
       ML_BASE_URL: http://ml:8001
+      MANGA_STORAGE_LOCAL_DIR: /srv/media
     ports:
       - "8080:8080"
+    volumes:
+      - media:/srv/media   # read the panel images ingestion writes, served at /media/**
 
   ingestion:
     build: ../services/ingestion
