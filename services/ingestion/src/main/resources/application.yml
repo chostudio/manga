@@ -1,0 +1,16 @@
+server:
+  port: ${INGESTION_PORT:8090}
+
+spring:
+  application:
+    name: ingestion
+  datasource:
+    url: ${DATABASE_JDBC_URL:jdbc:postgresql://localhost:5432/manga}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgrespassword}
+
+manga:
+  ml-base-url: ${ML_BASE_URL:http://localhost:8001}
+  storage:
+    local-dir: ${MANGA_STORAGE_LOCAL_DIR:../../media/storage}
+    media-url: ${MEDIA_URL:/media}

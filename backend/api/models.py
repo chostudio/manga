@@ -1,7 +1,7 @@
 from django.db import models
 from pgvector.django import VectorField
 
-SUB_ELEMENT_LABELS = ("face", "hair", "hand", "clothing")
+SUB_ELEMENT_LABELS = ("face", "eyes", "hand", "person")
 
 
 class ChapterIngestion(models.Model):
@@ -41,6 +41,9 @@ class StoredPanel(models.Model):
     content_type = models.CharField(max_length=64, default="image/avif")
     public_url = models.URLField(max_length=1024, blank=True)
     embedding = VectorField(dimensions=512, null=True, blank=True)
+    # Raw booru tags for this panel: {tag: score}. Denormalized copy of the
+    # PanelTag rows, kept for quick display / debugging.
+    tags = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -84,3 +87,37 @@ class PanelSubElement(models.Model):
 
     def __str__(self) -> str:
         return f"{self.panel} [{self.label}]"
+
+
+class PanelTag(models.Model):
+    """
+    One booru-style tag attached to a StoredPanel, with the tagger's confidence.
+
+    These rows power concept search: a query is mapped to candidate tags and
+    panels are ranked by the summed confidence of their matching tags.  ``source``
+    records where the tag came from ("panel" = whole panel, "face" = a face crop),
+    so face-derived emotion tags can be weighted differently if desired.
+    """
+
+    panel = models.ForeignKey(
+        StoredPanel,
+        on_delete=models.CASCADE,
+        related_name="tag_rows",
+    )
+    tag = models.CharField(max_length=128, db_index=True)
+    score = models.FloatField(default=0.0)
+    source = models.CharField(max_length=16, default="panel")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["panel", "tag"],
+                name="uniq_panel_tag",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tag", "score"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.panel} #{self.tag} ({self.score:.2f})"

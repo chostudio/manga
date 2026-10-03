@@ -15,7 +15,7 @@ export class SearchBar {
   onSearch(query: string) {
     if (!query.trim()) return;
     
-    this.http.get<{panels: any[]}>('http://localhost:8000/search', { params: { q: query } })
+    this.http.get<{panels: any[]}>('/search', { params: { q: query } })
       .subscribe({
         next: (response) => {
             console.log('Search response:', response);

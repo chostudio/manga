@@ -10,6 +10,11 @@ interface PanelResult {
   panel_index: number;
   url: string;
   matched_via: string;
+  score: number;
+  similarity: number;
+  matched_tags: string[];
+  matched_labels: string[];
+  tags: string[];
 }
 
 @Component({
@@ -51,12 +56,23 @@ export class Home {
   }
 
   formatMatchedVia(matched_via: string): string {
-    if (matched_via === 'panel') return 'Whole panel';
-    if (matched_via === 'fallback') return 'Fallback (no embedding)';
-    if (matched_via.startsWith('sub_element:')) {
-      const label = matched_via.replace('sub_element:', '');
-      return label.charAt(0).toUpperCase() + label.slice(1) + ' (sub-element)';
-    }
+    if (matched_via === 'tag') return 'Tag match';
+    if (matched_via === 'sub_element') return 'Detected element';
+    if (matched_via === 'related') return 'Related tag';
+    if (matched_via === 'vibes') return 'Vibes (CLIP)';
     return matched_via;
+  }
+
+  formatSimilarity(similarity: number): string {
+    return Math.round(similarity * 100) + '%';
+  }
+
+  formatScore(score: number): string {
+    return Math.round(Math.min(1, score) * 100) + '%';
+  }
+
+  formatMatchedLabels(labels: string[]): string {
+    if (!labels || labels.length === 0) return '';
+    return labels.map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ');
   }
 }

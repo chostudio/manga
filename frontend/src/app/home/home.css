@@ -29,6 +29,7 @@
   background: #18181b;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
 }
 
 .masonry-item:hover {
@@ -40,6 +41,20 @@
   display: block;
   width: 100%;
   height: auto;
+}
+
+.similarity-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 100px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #a3e635;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.02em;
 }
 
 /* ───────────────────────────────────────────────────────────
@@ -175,6 +190,35 @@
   background: rgba(139, 92, 246, 0.15);
   color: #a78bfa;
   letter-spacing: 0.01em;
+}
+
+.meta-badge.similarity {
+  background: rgba(163, 230, 53, 0.15);
+  color: #a3e635;
+  font-weight: 600;
+}
+
+.meta-badge.label-badge {
+  margin-right: 6px;
+  margin-bottom: 4px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+  text-transform: capitalize;
+}
+
+.meta-badge.tag-badge {
+  margin-right: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: rgba(113, 113, 122, 0.18);
+  color: #a1a1aa;
+}
+
+.meta-badge.tag-badge.tag-matched {
+  background: rgba(163, 230, 53, 0.18);
+  color: #a3e635;
+  font-weight: 600;
 }
 
 /* Small screens: stack vertically */

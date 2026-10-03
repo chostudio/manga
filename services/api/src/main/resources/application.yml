@@ -1,0 +1,19 @@
+server:
+  port: ${API_PORT:8080}
+
+spring:
+  application:
+    name: api
+  datasource:
+    url: ${DATABASE_JDBC_URL:jdbc:postgresql://localhost:5432/manga}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgrespassword}
+
+manga:
+  # Python ml service (CLIP text embedding for the vibes fallback)
+  ml-base-url: ${ML_BASE_URL:http://localhost:8001}
+  cors-origins: ${CORS_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
+  # Panel images (written by the ingestion service) are served at /media/**
+  storage:
+    local-dir: ${MANGA_STORAGE_LOCAL_DIR:../../media/storage}
+    media-url: ${MEDIA_URL:/media}

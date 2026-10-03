@@ -11,5 +11,10 @@ torch
 torchvision
 open-clip-torch
 pgvector
-ultralytics>=8.2
+ultralytics>=8.4
 django-cors-headers
+# Manga-aware panel detection weights are pulled from the Hugging Face hub.
+huggingface_hub>=0.24
+# Anime detectors (face/eyes/hand/person) + WD14 booru tagger.
+dghs-imgutils>=0.19
+onnxruntime>=1.18

@@ -1,26 +1,11 @@
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-interface StoredPanelResult {
-  panel_index: number;
-  storage_key: string;
-  byte_size: number;
-  content_type: string;
-  public_url: string;
-}
-
-interface UploadWebscrapeResponse {
-  chapter_id: string;
-  quality: string;
-  page_count: number;
-  fetched_ok: number;
-  stored_panels: number;
-  errors: { index: number; url: string; detail: string }[];
-  pages: {
-    index: number;
-    panel_count: number;
-    stored_panels: StoredPanelResult[];
-  }[];
+interface JobView {
+  job_id: string;
+  state: 'RUNNING' | 'DONE' | 'ERROR';
+  log: string[];
+  summary: { chapter_id?: string; quality?: string; pages?: number; panels?: number };
 }
 
 @Component({
@@ -39,30 +24,52 @@ export class Upload {
     if (!this.url) return;
 
     this.submitting = true;
-    this.message = '';
+    this.message = 'Starting ingest…';
     this.error = false;
 
     try {
-      const res = await fetch('/api/upload-webscrape', {
+      // Kick off an async ingest job on the ingestion service (proxied /ingest).
+      const res = await fetch('/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: this.url }),
+        body: JSON.stringify({ url: this.url, quality: 'data-saver' }),
       });
-
-      const data = (await res.json()) as UploadWebscrapeResponse & { detail?: string };
-
+      const started = (await res.json()) as JobView & { detail?: string };
       if (!res.ok) {
-        throw new Error(data.detail ?? `Server responded with ${res.status}`);
+        throw new Error(started.detail ?? `Server responded with ${res.status}`);
       }
 
-      this.message = `Stored ${data.stored_panels} panel(s) from ${data.fetched_ok}/${data.page_count} page(s).`;
+      // Poll the job until it finishes.
+      const job = await this.pollJob(started.job_id);
+      if (job.state === 'ERROR') {
+        throw new Error(job.log[job.log.length - 1] ?? 'Ingest failed');
+      }
+      const s = job.summary;
+      this.message = `Ingested ${s.panels ?? 0} panel(s) from ${s.pages ?? 0} page(s).`;
       this.url = '';
     } catch (err) {
       this.message =
-        err instanceof Error ? err.message : 'Upload failed. Is the backend running?';
+        err instanceof Error ? err.message : 'Ingest failed. Is the ingestion service running?';
       this.error = true;
     } finally {
       this.submitting = false;
+    }
+  }
+
+  private async pollJob(jobId: string): Promise<JobView> {
+    // Poll every 2s; ingest of a chapter can take a while (CPU inference).
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const res = await fetch(`/ingest/${jobId}`);
+      const job = (await res.json()) as JobView;
+      const done = job.summary?.panels;
+      this.message = job.state === 'RUNNING'
+        ? `Ingesting… ${job.log[job.log.length - 1] ?? ''}`
+        : this.message;
+      if (job.state !== 'RUNNING') {
+        return job;
+      }
+      void done;
     }
   }
 }
